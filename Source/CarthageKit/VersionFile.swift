@@ -58,6 +58,7 @@ public struct VersionFile: Codable {
 		case iOS = "iOS"
 		case watchOS = "watchOS"
 		case tvOS = "tvOS"
+        case macCatalyst = "macCatalyst"
 	}
 
 	/// The revision of the dependency (usually a version number)
@@ -70,7 +71,9 @@ public struct VersionFile: Codable {
 	public let watchOS: [CachedFramework]?
 	/// The tvOS cached frameworks
 	public let tvOS: [CachedFramework]?
-
+    /// The macCatalyst cached frameworks
+    public let macCatalyst: [CachedFramework]?
+    
 	/// The extension representing a serialized VersionFile.
 	static let pathExtension = "version"
 
@@ -87,6 +90,9 @@ public struct VersionFile: Codable {
 
 		case "tvOS":
 			return tvOS
+            
+        case "macCatalyst":
+            return macCatalyst
 			
 		default:
 			return nil
@@ -99,13 +105,15 @@ public struct VersionFile: Codable {
 		macOS: [CachedFramework]?,
 		iOS: [CachedFramework]?,
 		watchOS: [CachedFramework]?,
-		tvOS: [CachedFramework]?
+		tvOS: [CachedFramework]?,
+        macCatalyst: [CachedFramework]?
 	) {
 		self.commitish = commitish
 		self.macOS = macOS
 		self.iOS = iOS
 		self.watchOS = watchOS
 		self.tvOS = tvOS
+        self.macCatalyst = macCatalyst
 	}
 
 	/// Initializes a version file from the content of a file
@@ -447,10 +455,12 @@ private func createVersionFile(
 
 		let versionFile = VersionFile(
 			commitish: commitish,
-			macOS: sortedFrameworks(platformCaches[knownIn2019YearSDK("mac")]),
+			macOS: sortedFrameworks(platformCaches[knownIn2019YearSDK("macos")]),
 			iOS: sortedFrameworks(platformCaches[knownIn2019YearSDK("iphoneos")]),
 			watchOS: sortedFrameworks(platformCaches[knownIn2019YearSDK("watchos")]),
-			tvOS: sortedFrameworks(platformCaches[knownIn2019YearSDK("appletvos")]))
+			tvOS: sortedFrameworks(platformCaches[knownIn2019YearSDK("appletvos")]),
+            macCatalyst: sortedFrameworks(platformCaches[knownIn2019YearSDK("maccatalyst")])
+        )
 
 		return versionFile.write(to: versionFileURL)
 	}
@@ -540,7 +550,8 @@ public func createVersionFileForCommitish(
 					platformName = name
 					cachedFramework = CachedFramework(name: frameworkName, container: nil, libraryIdentifier: nil, hash: hash, linking: linking, swiftToolchainVersion: frameworkSwiftVersion)
 				case .xcframework(name: let container, libraryIdentifier: let identifier):
-					let targetOS = identifier.components(separatedBy: "-")[0]
+                    let targetOS = identifier.contains("maccatalyst") ?
+                    "maccatalyst" : identifier.components(separatedBy: "-")[0]
 					platformName = SDK.associatedSetOfKnownIn2019YearSDKs(targetOS).first?.platformSimulatorlessFromHeuristic
 					cachedFramework = CachedFramework(name: frameworkName, container: container, libraryIdentifier: identifier, hash: hash, linking: nil, swiftToolchainVersion: frameworkSwiftVersion)
 				}

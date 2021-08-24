@@ -106,7 +106,10 @@ public struct BuildArguments {
 			// Since we wouldn't be trying to build this target unless it were
 			// for macOS already, just let xcodebuild figure out the SDK on its
 			// own.
-			if sdk.rawValue != "macosx" {
+            //
+            // macCatalyst uses the iphoneos SDK but rather than specify, just use
+            // the destination and let xcodebuild figure it out.
+            if !["macosx", "maccatalyst"].contains(sdk.rawValue) {
 				args += [ "-sdk", sdk.rawValue ]
 			}
 		}

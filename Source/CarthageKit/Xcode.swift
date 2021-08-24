@@ -189,7 +189,9 @@ internal func checkFrameworkCompatibility(_ frameworkURL: URL, usingToolchain to
 /// Creates a task description for executing `xcodebuild` with the given
 /// arguments.
 public func xcodebuildTask(_ tasks: [String], _ buildArguments: BuildArguments, environment: [String: String]? = nil) -> Task {
-	return Task("/usr/bin/xcrun", arguments: buildArguments.arguments + tasks, environment: environment)
+	let task = Task("/usr/bin/xcrun", arguments: buildArguments.arguments + tasks, environment: environment)
+    print(task.description)
+    return task
 }
 
 /// Creates a task description for executing `xcodebuild` with the given
@@ -483,9 +485,12 @@ private func shouldBuildScheme(
 			guard settings.frameworkType.recover(nil) != nil else { return .empty }
 			return setSignal.map { $0.intersection(supportedFrameworks) }
 		}
-		.reduce(into: false) {
-			let filter = (platformAllowList ?? $1).contains
-			$0 = $0 || $1.firstIndex(where: filter) != nil
+		.reduce(into: false) { previousValue, frameworkSupportedPlatforms in
+            let buildPlatforms = (platformAllowList ?? frameworkSupportedPlatforms).map { $0.buildPlatform }
+            let match = frameworkSupportedPlatforms.firstIndex { supportedPlatform in
+                buildPlatforms.contains(supportedPlatform.rawValue)
+            }
+            previousValue = previousValue || match != nil
 		}
 }
 
@@ -936,6 +941,43 @@ private func build(
 				}
 				.map { "platform=\(sdk.platformSimulatorlessFromHeuristic) Simulator,id=\($0.udid.uuidString)" }
 		}
+        //
+        if sdk.rawValue == "maccatalyst" {
+            // Arch values are x86_64 or i386. x86_64 will also result in an arm64 arch
+            return SignalProducer(["platform=macOS,variant=Mac Catalyst"])
+//            var args = [ "xcodebuild", "-showdestinations", "-workspace", buildArgs.project.fileURL.path ]
+//            if let scheme = buildArgs.scheme {
+//                args += [ "-scheme", scheme.name ]
+//            }
+//            let destinationLookup = Task("/usr/bin/xcrun", arguments: args)
+//            return destinationLookup.launch()
+//                .mapError(CarthageError.taskError)
+//                .ignoreTaskData()
+//                .flatMap(.concat) { (data: Data) -> SignalProducer<String?, CarthageError> in
+//                    guard let result = String(data: data, encoding: .utf8) else {
+//                        return .init(error: .parseError(description: "Unable to read result of xcodebuild -showdestinations"))
+//                    }
+//                    guard let line = result.split(separator: "\n").first(where: { $0.contains("Mac Catalyst") })
+//                    else { return .init(error: .destinationNotFound(description: "Mac Catalyst")) }
+//                    let keyValuePairs = line
+//                        .replacingOccurrences(of: ",", with: "")
+//                        .replacingOccurrences(of: "\t", with: "")
+//                        .replacingOccurrences(of: "{", with: "")
+//                        .replacingOccurrences(of: "}", with: "")
+//                        .split(separator: " ")
+//                    guard let idKeyValue = keyValuePairs.first(where: { $0.starts(with: "id:") })
+//                    else { return .init(error: .destinationNotFound(description: "No Id found")) }
+//
+//                    return .init(value: idKeyValue.replacingOccurrences(of: "id:", with: ""))
+//                }
+//                .map { id in
+//                    if let id = id {
+//                        return "platform=macOS,variant=Mac Catalyst,id=\(id)"
+//                    } else {
+//                        return "platform=macOS,variant=Mac Catalyst"
+//                    }
+//                }
+        }
 		return SignalProducer(value: nil)
 	}
 
@@ -1057,6 +1099,7 @@ public func createDebugInformation(_ builtProductURL: URL) -> SignalProducer<Tas
 		let executable = builtProductURL.appendingPathComponent(executableName).path
 		let dSYM = dSYMURL.path
 		let dsymutilTask = Task("/usr/bin/xcrun", arguments: ["dsymutil", executable, "-o", dSYM])
+        print(dsymutilTask.description)
 
 		return dsymutilTask.launch()
 			.mapError(CarthageError.taskError)
@@ -1128,7 +1171,12 @@ public func buildInDirectory( // swiftlint:disable:this function_body_length
 				let initialValue = (project, scheme)
 
 				let wrappedSDKFilter: SDKFilterCallback = { sdks, scheme, configuration, project in
-					return sdkFilter((options.platforms /* allow list */ ?? sdks).intersection(sdks), scheme, configuration, project)
+                    let sdkBuildPlatforms = sdks.map { $0.buildPlatform }
+                    let matchedPlatforms = (options.platforms ?? sdks).filter { platform in
+                        sdkBuildPlatforms.contains(platform.buildPlatform)
+                    }
+					let result = sdkFilter(matchedPlatforms, scheme, configuration, project)
+                    return result
 				}
 
 				return buildScheme(

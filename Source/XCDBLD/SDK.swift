@@ -43,6 +43,10 @@ public struct SDK: Hashable {
 	public static func == (lhs: SDK, rhs: SDK) -> Bool {
 		return lhs.rawValue == rhs.rawValue
 	}
+    
+    public var buildPlatform: String {
+        return rawValue == "maccatalyst" ? "iphoneos" : rawValue
+    }
 
 	/// Take `simulatorHeuristic` and (best as possible) derive what used to be `XCDBLD.Platform` from it.
 	/// With data from `xcodebuild -showsdks -json`, should do solid job.
@@ -85,6 +89,7 @@ public struct SDK: Hashable {
 			"WatchSimulator": (["watchOS Simulator", "watchsimulator"], "Simulator - watchOS"),
 			"AppleTVOS": (["tvOS"], "tvOS"),
 			"AppleTVSimulator": (["tvOS Simulator", "appletvsimulator", "tvsimulator"], "Simulator - tvOS"),
+            "MacCatalyst": (["macCatalyst"], "macCatalyst"),
 		] as KeyValuePairs).reduce(into: [:]) {
 			$0[$1.0.lowercased()] = ($1.0, $1.1.0, $1.1.1)
 		}

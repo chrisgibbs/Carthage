@@ -97,7 +97,12 @@ public func mergeIntoXCFramework(
 
 	return buildExistingLibraryArguments.promoteError().flatMap(.concat) { existingLibraryArguments in
 		let arguments = baseArguments + newLibraryArguments + existingLibraryArguments
-		return Task("/usr/bin/xcrun", arguments: arguments).launch().ignoreTaskData().map { _ in outputURL }
+		let task = Task("/usr/bin/xcrun", arguments: arguments)
+        print(task.description)
+        return task.launch().ignoreTaskData().map { _ in
+            outputURL
+            
+        }
 	}
 }
 

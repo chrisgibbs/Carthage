@@ -201,7 +201,10 @@ public struct BuildSettings {
 
 	private var archiveIntermediatesBuildProductsPath: Result<String, CarthageError> {
 		let r1 = self["TARGET_NAME"]
-		guard let schemeOrTarget = arguments.scheme?.name ?? r1.value else { return r1 }
+		guard let schemeOrTarget = arguments.scheme?.name ?? r1.value else {
+            return r1
+            
+        }
 
 		let basePath = "ArchiveIntermediates/\(schemeOrTarget)/BuildProductsPath"
 		let pathComponent: String
@@ -213,7 +216,19 @@ public struct BuildSettings {
 		{
 			// This is required to support CocoaPods-generated projects.
 			// See https://github.com/AliSoftware/Reusable/issues/50#issuecomment-336434345 for the details.
-			pathComponent = String(builtProductsDir[buildDir.endIndex...]) // e.g., /Release-iphoneos/Reusable-iOS
+			var path = String(builtProductsDir[buildDir.endIndex...]) // e.g., /Release-iphoneos/Reusable-iOS
+            
+            // Change "Release-iphoneos" -> "Release-maccatalyst" if necessary.
+            // Or Sometimes change "Release" -> "Release-maccatalyst"
+            if arguments.sdk?.rawValue == "maccatalyst" {
+                if path.contains("-iphoneos") {
+                    path = path.replacingOccurrences(of: "iphoneos", with: "maccatalyst")
+                } else {
+                    path = path + "-maccatalyst"
+                }
+            }
+            
+            pathComponent = path
 		} else {
 			let r2 = self["CONFIGURATION"]
 			guard let configuration = r2.value else { return r2 }
@@ -307,11 +322,23 @@ public struct BuildSettings {
 
 	/// Attempts to determine target build directory
 	public var targetBuildDirectory: Result<String, CarthageError> {
-		return self["TARGET_BUILD_DIR"]
+        var buildDir = self["TARGET_BUILD_DIR"].value ?? ""
+        // Change Release-iphoneos -> Release-maccatalyst if necessary
+//        if arguments.sdk?.rawValue == "maccatalyst" {
+//            if buildDir.contains("-iphoneos") {
+//                buildDir = buildDir.replacingOccurrences(of: "iphoneos", with: "maccatalyst")
+//            } else {
+//                buildDir = buildDir + "-maccatalyst"
+//            }
+//        }
+        return .success(buildDir)
 	}
 
 	/// The "OPERATING_SYSTEM" component of the target triple. Used in XCFrameworks to denote the supported platform.
 	public var platformTripleOS: Result<String, CarthageError> {
+        if arguments.sdk?.rawValue == "maccatalyst" {
+            return .success("ios")
+        }
 		return self["LLVM_TARGET_TRIPLE_OS_VERSION"].map { osVersion in
 			// osVersion is a string like "ios8.0". Remove any trailing version number.
 			// This should match the OS component of an "unversionedTriple" printed by `swift -print-target-info`.
@@ -327,7 +354,10 @@ public struct BuildSettings {
 	// The "ENVIRONMENT" component of the target triple, which is "simulator" when building for a simulator target
 	// and missing otherwise.
 	public var platformTripleVariant: Result<String, CarthageError> {
-		return self["LLVM_TARGET_TRIPLE_SUFFIX"].map { $0.stripping(prefix: "-") }
+        if arguments.sdk?.rawValue == "maccatalyst" {
+            return .success("maccatalyst")
+        }
+        return self["LLVM_TARGET_TRIPLE_SUFFIX"].map({ $0.stripping(prefix: "-") })
 	}
 
 	/// Add subdirectory path if it's not possible to paste product to destination path

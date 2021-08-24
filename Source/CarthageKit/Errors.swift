@@ -117,6 +117,8 @@ public enum CarthageError: Error {
 	/// 	The device and simulator slices for "(productName)" both build for: (commonArchitectures)
 	/// Rebuild with --use-xcframeworks to create an xcframework bundle instead.
 	case xcframeworkRequired(XCFrameworkRequired)
+    
+    case destinationNotFound(description: String)
 }
 
 extension CarthageError {
@@ -406,6 +408,9 @@ extension CarthageError: CustomStringConvertible {
 					"The device and simulator slices for \"\(info.productName)\" both build for: \(archs)",
 				"Rebuild with --use-xcframeworks to create an xcframework bundle instead."
 			].joined(separator: "\n")
+            
+        case let .destinationNotFound(description):
+            return "Xcode destination matching \"\(description)\" was not found."
 		}
 	}
 }
